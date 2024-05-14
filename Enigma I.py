@@ -6,7 +6,7 @@ class Enigma:
             "AJDKSIRUXBLHWTMCQGZNPYFVOE",  # Rotor II
             "BDFHJLCPRTXVZNYEIWGAKMUSQO",  # Rotor III
             "ESOVPZJAYQUIRHXLNFTGKDCMWB",  # Rotor IV
-            "VZBRGITYUPSDNHLXAWMJQOFECK"  # Rotor V
+            "VZBRGITYUPSDNHLXAWMJQOFECK"   # Rotor V
         ]
         rotor_labels = ['I', 'II', 'III', 'IV', 'V']
         rotor_index_map = {label: index for index, label in enumerate(rotor_labels)}
@@ -14,17 +14,17 @@ class Enigma:
 
         turnover_notches = [
             [16],  # Rotor I   (Q -> R)
-            [4],  # Rotor II  (E -> F)
+            [4],   # Rotor II  (E -> F)
             [21],  # Rotor III (V -> W)
-            [9],  # Rotor IV  (J -> K)
-            [25]  # Rotor V   (Z -> A)
+            [9],   # Rotor IV  (J -> K)
+            [25]   # Rotor V   (Z -> A)
         ]
 
         # Reflector wirings
         reflectors = {
             'A': "EJMZALYXVBWFCRQUONTSPIKHGD",  # Reflector A
             'B': "YRUHQSLDPXNGOKMIEBFZCWVJAT",  # Reflector B
-            'C': "FVPJIAOYEDRZXWGCTKUQSBNMHL"  # Reflector C
+            'C': "FVPJIAOYEDRZXWGCTKUQSBNMHL"   # Reflector C
         }
 
         # Entry Wheel (ETW) with direct wiring
@@ -85,19 +85,28 @@ class Enigma:
 
 
 def setup_enigma():
-    reflector_choice = input("Choose reflector (A, B, or C): ").upper()
-    rotor_choices = input("Enter rotor choices (e.g., IV III II or iv iii ii): ").split()
-    ring_settings = input("Enter ring settings without spaces (e.g., AAA or aaa): ")
-    initial_positions = input("Enter initial positions without spaces (e.g., AAA or aaa): ")
-    plugboard_pairs = input(
-        "Enter up to 10 plugboard pairs separated by space (e.g., AB CD EF or ab cd ef or none for no pairs): ")
-    if plugboard_pairs.lower() == 'none':
-        plugboard_settings = []
-    else:
-        plugboard_settings = plugboard_pairs.split()
+    def get_input(prompt, valid_choices=None, transform=str, validation=None):
+        while True:
+            user_input = input(prompt).strip()
+            if valid_choices and user_input.upper() not in valid_choices:
+                print(f"Invalid choice. Choose from {valid_choices}.")
+                continue
+            if validation and not validation(user_input):
+                print("Invalid input.")
+                continue
+            return transform(user_input)
 
-    enigma_machine = Enigma(rotor_choices, ring_settings, initial_positions, reflector_choice, plugboard_settings)
-    plaintext = input("Enter the plaintext message to encode: ")
+    reflector_choice = get_input("Choose reflector (A, B, or C): ", valid_choices={'A', 'B', 'C'}, transform=str.upper)
+    rotor_choices = get_input("Enter rotor choices (e.g., IV III II or iv iii ii): ", transform=lambda s: s.split())
+    ring_settings = get_input("Enter ring settings without spaces (e.g., AAA or aaa): ")
+    initial_positions = get_input("Enter initial positions without spaces (e.g., AAA or aaa): ")
+    plugboard_pairs = get_input(
+        "Enter up to 10 plugboard pairs separated by space (e.g., AB CD EF or ab cd ef or none for no pairs): ",
+        transform=lambda s: [] if s.lower() == 'none' else s.split()
+    )
+
+    enigma_machine = Enigma(rotor_choices, ring_settings, initial_positions, reflector_choice, plugboard_pairs)
+    plaintext = get_input("Enter the plaintext message to encode: ")
     encoded_message = enigma_machine.encode(plaintext)
     print("Encoded message:")
     print(encoded_message)
