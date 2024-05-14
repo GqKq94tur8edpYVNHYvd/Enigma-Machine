@@ -1,6 +1,6 @@
 class Enigma:
     def __init__(self, rotor_choices, ring_settings, initial_positions, reflector_choice, plugboard_settings):
-        # Wiring of the rotors (A = 0, B = 1, ..., Z = 25)
+        # Rotor wirings (A = 0, B = 1, ..., Z = 25)
         rotor_wirings = [
             "EKMFLGDQVZNTOWYHXUSPAIBRCJ",  # Rotor I
             "AJDKSIRUXBLHWTMCQGZNPYFVOE",  # Rotor II
@@ -9,27 +9,28 @@ class Enigma:
             "VZBRGITYUPSDNHLXAWMJQOFECK",  # Rotor V
             "JPGVOUMFYQBENHZRDKASXLICTW",  # Rotor VI
             "NZJHGRCXMYSWBOUFAIVLPEKQDT",  # Rotor VII
-            "FKQHTLXOCBJSPDZRAMEWNIUYGV"  # Rotor VIII
+            "FKQHTLXOCBJSPDZRAMEWNIUYGV"   # Rotor VIII
         ]
         rotor_labels = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
         rotor_index_map = {label: index for index, label in enumerate(rotor_labels)}
         rotor_index_map.update({label.lower(): index for label, index in rotor_index_map.items()})
 
+        # Turnover notches for each rotor
         turnover_notches = [
             [16],  # Rotor I   (Q -> R)
-            [4],  # Rotor II  (E -> F)
+            [4],   # Rotor II  (E -> F)
             [21],  # Rotor III (V -> W)
-            [9],  # Rotor IV  (J -> K)
+            [9],   # Rotor IV  (J -> K)
             [25],  # Rotor V   (Z -> A)
             [12, 25],  # Rotor VI   (M -> N, Z -> A)
             [12, 25],  # Rotor VII  (M -> N, Z -> A)
-            [12, 25]  # Rotor VIII (M -> N, Z -> A)
+            [12, 25]   # Rotor VIII (M -> N, Z -> A)
         ]
 
         # Reflector wirings
         reflectors = {
             'B': "YRUHQSLDPXNGOKMIEBFZCWVJAT",  # Reflector B
-            'C': "FVPJIAOYEDRZXWGCTKUQSBNMHL"  # Reflector C
+            'C': "FVPJIAOYEDRZXWGCTKUQSBNMHL"   # Reflector C
         }
 
         # Entry Wheel (ETW) with direct wiring
