@@ -1,6 +1,5 @@
 class Enigma:
     def __init__(self, rotor_choices, ring_settings, initial_positions, reflector_choice, plugboard_settings):
-        # Wiring of the rotors (A = 0, B = 1, ..., Z = 25)
         rotor_wirings = [
             "EKMFLGDQVZNTOWYHXUSPAIBRCJ",  # Rotor I
             "AJDKSIRUXBLHWTMCQGZNPYFVOE",  # Rotor II
@@ -20,17 +19,14 @@ class Enigma:
             [25]   # Rotor V   (Z -> A)
         ]
 
-        # Reflector wirings
         reflectors = {
             'A': "EJMZALYXVBWFCRQUONTSPIKHGD",  # Reflector A
             'B': "YRUHQSLDPXNGOKMIEBFZCWVJAT",  # Reflector B
             'C': "FVPJIAOYEDRZXWGCTKUQSBNMHL"   # Reflector C
         }
 
-        # Entry Wheel (ETW) with direct wiring
-        self.etw = list(range(26))  # This represents the wiring ABCDEFGHIJKLMNOPQRSTUVWXYZ
+        self.etw = list(range(26))  # Entry Wheel
 
-        # Convert rotor wirings and reflectors to numeric form
         chosen_rotors = [rotor_index_map[choice] for choice in rotor_choices]
         self.rotors = [[ord(c) - ord('A') for c in rotor_wirings[i]] for i in chosen_rotors]
         self.turnovers = [turnover_notches[i] for i in chosen_rotors]
@@ -38,15 +34,13 @@ class Enigma:
         self.ring_settings = [ord(c.upper()) - ord('A') for c in ring_settings]
         self.positions = [ord(c.upper()) - ord('A') for c in initial_positions]
 
-        # Setup plugboard
         self.plugboard = {i: i for i in range(26)}
         for pair in plugboard_settings:
-            if pair:  # Ensure pair is not an empty string
+            if pair:
                 a, b = ord(pair[0].upper()) - ord('A'), ord(pair[1].upper()) - ord('A')
                 self.plugboard[a], self.plugboard[b] = b, a
 
     def rotate(self):
-        # Rightmost rotor
         carry = True
         for i in range(2, -1, -1):
             if carry:
@@ -56,25 +50,18 @@ class Enigma:
     def encode_char(self, char):
         char_index = self.plugboard[ord(char) - ord('A')]
 
-        # Pass through the Entry Wheel
-        char_index = self.etw[char_index]
-
         self.rotate()
 
-        # Forward pass through the rotors
         for i in range(2, -1, -1):
             char_index = (self.rotors[i][(char_index + self.positions[i] - self.ring_settings[i]) % 26] -
                           self.positions[i] + self.ring_settings[i]) % 26
 
-        # Reflector
         char_index = self.reflector[char_index]
 
-        # Backward pass through the rotors
         for i in range(3):
             char_index = (self.rotors[i].index((char_index + self.positions[i] - self.ring_settings[i]) % 26) -
                           self.positions[i] + self.ring_settings[i]) % 26
 
-        # Through plugboard again
         return chr(self.plugboard[char_index] + ord('A'))
 
     def encode(self, message):
@@ -112,5 +99,4 @@ def setup_enigma():
     print(encoded_message)
 
 
-# Run the setup function to configure and use the Enigma machine
 setup_enigma()
