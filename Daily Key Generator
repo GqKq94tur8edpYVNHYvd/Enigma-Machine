@@ -1,0 +1,58 @@
+# Enigma Daily Settings / Code Book Generator
+# 31 de zile, Enigma I, reflector UKW-B, 4 Key Groups/zi
+
+from random import sample
+from string import ascii_uppercase
+
+NUMBER_OF_DAYS = 31
+REFLECTOR = "UKW-B"
+
+
+def rotor_selection(number_of_rotors):
+    rotors = ["I", "II", "III", "IV", "V"]
+    selected = sample(rotors[:number_of_rotors], 3)
+    return f"{' '.join(selected):<9}"
+
+
+def ring_settings(number_of_rotors):
+    return ''.join(sample(ascii_uppercase, number_of_rotors))
+
+
+def plugboard_settings(number_of_pairs):
+    letters = list(ascii_uppercase)
+    shuffled = sample(letters, number_of_pairs * 2)
+    pairs = [f"{shuffled[i]}{shuffled[i + 1]}" for i in range(0, len(shuffled), 2)]
+    return ' '.join(pairs)
+
+
+def key_groups_generator(count):
+    return ' '.join(
+        [''.join(sample(ascii_uppercase, 3)) for _ in range(count)]
+    )
+
+
+def print_title():
+    title = f"ENIGMA I - {REFLECTOR} Reflector - 31-Day Code Book"
+    print(title)
+    print("=" * len(title))
+    print("Day Rotor   Ring  Plugboard Stecker             Key Groups")
+    print("-" * 75)
+
+
+def main():
+    print_title()
+
+    days = []
+    for day in range(1, NUMBER_OF_DAYS + 1):
+        rotor = rotor_selection(5)
+        ring = ring_settings(3)
+        plugboard = plugboard_settings(10)
+        key_groups = key_groups_generator(4)
+        days.append((day, rotor, ring, plugboard, key_groups))
+
+    for day, rotor, ring, plugboard, key_groups in reversed(days):
+        print(f"{day:2d}  {rotor} {ring}  {plugboard:<30} Key Groups: {key_groups}")
+
+
+if __name__ == "__main__":
+    main()
