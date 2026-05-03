@@ -1,0 +1,249 @@
+import itertools, string
+from multiprocessing import Pool, cpu_count
+from numba import njit
+
+ALPHABET = string.ascii_uppercase
+A2I = {c: i for i, c in enumerate(ALPHABET)}
+I2A = {i: c for i, c in enumerate(ALPHABET)}
+
+ROTOR_SPECS = {
+    "I":   ("EKMFLGDQVZNTOWYHXUSPAIBRCJ", "Q"),
+    "II":  ("AJDKSIRUXBLHWTMCQGZNPYFVOE", "E"),
+    "III": ("BDFHJLCPRTXVZNYEIWGAKMUSQO", "V"),
+    "IV":  ("ESOVPZJAYQUIRHXLNFTGKDCMWB", "J"),
+    "V":   ("VZBRGITYUPSDNHLXAWMJQOFECK", "Z"),
+}
+
+REFLECTORS = {
+    "A": "EJMZALYXVBWFCRQUONTSPIKHGD",
+    "B": "YRUHQSLDPXNGOKMIEBFZCWVJAT",
+    "C": "FVPJIAOYEDRZXWGCTKUQSBNMHL",
+}
+
+# ---------- util ----------
+
+def sanitize(s):
+    return [A2I[c] for c in s.upper() if c in A2I]
+
+def inverse_wiring(w):
+    inv = [0]*26
+    for i, c in enumerate(w):
+        inv[A2I[c]] = i
+    return inv
+
+def build_rotor(name):
+    w, notch = ROTOR_SPECS[name]
+    return (
+        [A2I[c] for c in w],
+        inverse_wiring(w),
+        A2I[notch]
+    )
+
+def build_reflector(name):
+    return [A2I[c] for c in REFLECTORS[name]]
+
+# ---------- CORE JIT ----------
+
+@njit
+def enc_char(idx,
+             r_w, r_inv, r_notch,
+             m_w, m_inv, m_notch,
+             l_w, l_inv, l_notch,
+             rpos, mpos, lpos,
+             rr, rm, rl,
+             ref):
+
+    # stepping
+    mid_notch = (mpos == m_notch)
+    right_notch = (rpos == r_notch)
+
+    if mid_notch:
+        lpos = (lpos + 1) % 26
+        mpos = (mpos + 1) % 26
+    elif right_notch:
+        mpos = (mpos + 1) % 26
+
+    rpos = (rpos + 1) % 26
+
+    # forward R
+    off = rpos - (rr - 1)
+    x = idx + off
+    if x >= 26: x -= 26
+    if x < 0: x += 26
+    idx = r_w[x] - off
+    if idx >= 26: idx -= 26
+    if idx < 0: idx += 26
+
+    # M
+    off = mpos - (rm - 1)
+    x = idx + off
+    if x >= 26: x -= 26
+    if x < 0: x += 26
+    idx = m_w[x] - off
+    if idx >= 26: idx -= 26
+    if idx < 0: idx += 26
+
+    # L
+    off = lpos - (rl - 1)
+    x = idx + off
+    if x >= 26: x -= 26
+    if x < 0: x += 26
+    idx = l_w[x] - off
+    if idx >= 26: idx -= 26
+    if idx < 0: idx += 26
+
+    # reflector
+    idx = ref[idx]
+
+    # backward L
+    off = lpos - (rl - 1)
+    x = idx + off
+    if x >= 26: x -= 26
+    if x < 0: x += 26
+    idx = l_inv[x] - off
+    if idx >= 26: idx -= 26
+    if idx < 0: idx += 26
+
+    # M
+    off = mpos - (rm - 1)
+    x = idx + off
+    if x >= 26: x -= 26
+    if x < 0: x += 26
+    idx = m_inv[x] - off
+    if idx >= 26: idx -= 26
+    if idx < 0: idx += 26
+
+    # R
+    off = rpos - (rr - 1)
+    x = idx + off
+    if x >= 26: x -= 26
+    if x < 0: x += 26
+    idx = r_inv[x] - off
+    if idx >= 26: idx -= 26
+    if idx < 0: idx += 26
+
+    return idx, rpos, mpos, lpos
+
+
+@njit
+def test_inner(cipher, crib,
+               r_w, r_inv, r_notch,
+               m_w, m_inv, m_notch,
+               l_w, l_inv, l_notch,
+               ref):
+
+    n = len(crib)
+
+    for rR in range(1, 27):
+        for rM in range(1, 27):
+
+            rr = rR
+            rm = rM
+            rl = 1
+
+            for rpos in range(26):
+                for mpos in range(26):
+                    for lpos in range(26):
+
+                        rp = rpos
+                        mp = mpos
+                        lp = lpos
+
+                        ok = True
+
+                        for i in range(n):
+
+                            c, rp, mp, lp = enc_char(
+                                cipher[i],
+                                r_w, r_inv, r_notch,
+                                m_w, m_inv, m_notch,
+                                l_w, l_inv, l_notch,
+                                rp, mp, lp,
+                                rr, rm, rl,
+                                ref
+                            )
+
+                            if c != crib[i]:
+                                ok = False
+                                break
+
+                        if ok:
+                            return rR, rM, rpos, mpos, lpos
+
+    return -1, -1, -1, -1, -1
+
+
+# ---------- multiprocessing ----------
+
+def test_config(args):
+    order, reflector, cipher, crib = args
+
+    r_w, r_inv, r_notch = build_rotor(order[0])
+    m_w, m_inv, m_notch = build_rotor(order[1])
+    l_w, l_inv, l_notch = build_rotor(order[2])
+    ref = build_reflector(reflector)
+
+    res = test_inner(cipher, crib,
+                     r_w, r_inv, r_notch,
+                     m_w, m_inv, m_notch,
+                     l_w, l_inv, l_notch,
+                     ref)
+
+    if res[0] != -1:
+        return order, res
+
+    return None
+
+
+def search(cipher, crib, reflector):
+    rotor_names = ["I","II","III","IV","V"]
+    orders = list(itertools.permutations(rotor_names, 3))
+
+    tasks = [(order, reflector, cipher, crib) for order in orders]
+
+    workers = max(1, cpu_count() - 1)
+
+    with Pool(workers) as p:
+        for res in p.imap_unordered(test_config, tasks):
+            if res:
+                p.terminate()
+                return res
+    return None
+
+
+# ---------- main ----------
+
+def main():
+    print("=== ENIGMA NUMBA MAX SAFE ===")
+
+    refl = input("Reflector (A/B/C): ").strip().upper()
+    cipher = sanitize(input("Text cifrat: "))
+    crib = sanitize(input("Crib: "))
+
+    print("Warm-up JIT...")
+
+    # warm-up (nu afectează rezultatul)
+    test_inner(
+        [0], [1],
+        *build_rotor("I"),
+        *build_rotor("II"),
+        *build_rotor("III"),
+        build_reflector("B")
+    )
+
+    print("Caut...")
+
+    res = search(cipher, crib, refl)
+
+    if res:
+        order, (rR, rM, rpos, mpos, lpos) = res
+        print("\n[GĂSIT]")
+        print("Rotoare:", order[::-1])
+        print("Ring:", (1, rM, rR)[::-1])
+        print("Pos:", tuple(I2A[p] for p in (lpos, mpos, rpos)))
+    else:
+        print("Nimic găsit.")
+
+
+if __name__ == "__main__":
+    main()
